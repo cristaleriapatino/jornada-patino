@@ -639,7 +639,8 @@ async function initFirebase(){
     goHome();
   } catch(e){
     console.error('Error cargando Firebase:', e);
-    document.getElementById('loading-overlay').innerHTML='<div style="color:#ef4444;font-size:14px;text-align:center;padding:2rem">Error de conexión.<br>Comprueba tu internet e intenta de nuevo.<br><br><button onclick="location.reload()" style="background:#4f7cff;border:none;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer">Reintentar</button></div>';
+    const errMsg = e && e.code ? e.code : (e && e.message ? e.message : 'desconocido');
+    document.getElementById('loading-overlay').innerHTML='<div style="color:#ef4444;font-size:14px;text-align:center;padding:2rem">Error de conexión con Firebase.<br><br><span style="font-size:11px;color:#f87171;background:rgba(239,68,68,0.1);padding:6px 12px;border-radius:8px;display:inline-block;margin-bottom:12px">'+errMsg+'</span><br><br>Comprueba tu internet e intenta de nuevo.<br><br><button onclick="location.reload()" style="background:#4f7cff;border:none;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer">Reintentar</button></div>';
   }
 }
 
