@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Control de Jornada</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
@@ -2681,7 +2681,7 @@ function doExport(tipo){
   autoWidth(wsSummary, summaryRows);
   XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
 
-  XLSX.writeFile(wb, 'jornada_' + (config.empresa||'empresa').replace(/[^a-zA-Z0-9]/g,'_') + '_' + today() + '.xlsx', {cellStyles:true, bookSST:false});
+  XLSX.writeFile(wb, 'jornada_' + (config.empresa||'empresa').replace(/[^a-zA-Z0-9]/g,'_') + '_' + today() + '.xlsx');
 }
 
 function buildEmail(){
