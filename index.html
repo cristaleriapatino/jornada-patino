@@ -1073,8 +1073,8 @@ function guardarManual(){
   alert('Registro guardado para el '+fecha);
 }
 
-function renderRegistros(c){
-  const sorted=[...registros].sort((a,b)=>b.fecha.localeCompare(a.fecha)||a.empId-b.empId);
+function renderRegistros(c, keepFilter){
+  const prevFilter = keepFilter || document.getElementById('reg-filter-emp')?.value || '';
   c.innerHTML=`<div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
     <button class="btn-primary" onclick="abrirNuevoRecAdmin()">+ Nuevo registro (R. General)</button>
     <button class="btn-primary" style="background:linear-gradient(135deg,#6c36c8,#a78bfa)" onclick="abrirTramoAdmin()">+ Tramo autonomo</button>
@@ -1082,12 +1082,17 @@ function renderRegistros(c){
   <div style="margin-bottom:1rem;padding:12px 14px;background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);border-radius:12px" id="tramos-admin-section"></div>
   <div class="form-field" style="margin-bottom:1rem">
     <label>Filtrar por empleado</label>
-    <select id="reg-filter-emp" onchange="renderRegistros(document.getElementById('admin-content'))" style="background:var(--bg2);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px;color:var(--text);font-size:13px;width:100%">
+    <select id="reg-filter-emp" onchange="filtrarRegistros()" style="background:var(--bg2);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px;color:var(--text);font-size:13px;width:100%">
       <option value="">Todos</option>
-      ${empleados.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')}
+      ${empleados.map(e=>`<option value="${e.id}"${e.id==prevFilter?' selected':''}>${e.nombre}</option>`).join('')}
     </select>
   </div>
   <div id="reg-list"></div>`;
+  renderRegList();
+  renderTramosAdmin();
+}
+
+function filtrarRegistros(){
   renderRegList();
   renderTramosAdmin();
 }
@@ -1138,6 +1143,19 @@ function desmarcarRevisado(idx){
 }
 
 
+
+function marcarTramoRevisado(id){
+  const t=tramos.find(x=>x.id===id);if(!t)return;
+  t.revisado=true;
+  saveAll();renderTramosAdmin();
+}
+
+function desmarcarTramoRevisado(id){
+  const t=tramos.find(x=>x.id===id);if(!t)return;
+  t.revisado=false;
+  saveAll();renderTramosAdmin();
+}
+
 function renderTramosAdmin(){
   const el=document.getElementById('tramos-admin-section');if(!el)return;
   const autonomos=empleados.filter(e=>e.categoria==='autonomo');
@@ -1150,14 +1168,18 @@ function renderTramosAdmin(){
   el.innerHTML='<div style="font-size:11px;color:#a78bfa;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Tramos Autonomos</div>'+
   list.map(t=>{
     const emp=empById(t.empId);
-    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);flex-wrap:wrap">
+    const revBtn=!t.revisado
+      ?`<button onclick="marcarTramoRevisado('${t.id}')" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:8px;color:#22c55e;font-size:11px;padding:5px 8px;cursor:pointer;white-space:nowrap">✓ Revisado</button>`
+      :`<button onclick="desmarcarTramoRevisado('${t.id}')" style="background:transparent;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#7b82a8;font-size:11px;padding:5px 8px;cursor:pointer;white-space:nowrap">Desmarcar</button>`;
+    const revBadge=t.revisado?'<span style="background:rgba(34,197,94,0.15);color:#22c55e;font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">✓</span>':'';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);flex-wrap:wrap${t.revisado?';opacity:0.75':''}">
       <div style="width:28px;height:28px;border-radius:50%;background:${emp?emp.color+'22':'#fff1'};color:${emp?emp.color:'#fff'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">${emp?initials(emp.nombre):'?'}</div>
       <div style="flex:1;min-width:100px">
-        <div style="font-size:12px;font-weight:500">${emp?emp.nombre:'?'} · ${t.fecha}</div>
+        <div style="font-size:12px;font-weight:500;display:flex;align-items:center">${emp?emp.nombre:'?'} · ${t.fecha}${revBadge}</div>
         <div style="font-size:11px;color:#7b82a8">${t.inicio}${t.fin?'–'+t.fin:' (en curso)'}${t.descanso?' (−'+t.descanso+'min descanso)':''} · ${t.descripcion||'Sin descripcion'}</div>
       </div>
       <div style="font-size:12px;font-weight:600;color:#a78bfa">${fmtH(calcTramoH(t))}</div>
-      <button onclick="editTramoAdmin('${t.id}')" style="background:rgba(79,124,255,0.15);border:none;border-radius:8px;color:#4f7cff;font-size:11px;padding:5px 8px;cursor:pointer">Editar</button>
+      <div style="display:flex;gap:5px;flex-shrink:0">${revBtn}<button onclick="editTramoAdmin('${t.id}')" style="background:rgba(79,124,255,0.15);border:none;border-radius:8px;color:#4f7cff;font-size:11px;padding:5px 8px;cursor:pointer">Editar</button></div>
     </div>`;
   }).join('');
 }
@@ -1410,11 +1432,12 @@ function generarMiResumen(fromParam, toParam){
   const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8">
 <title>Mi resumen — ${emp.nombre} — ${mesLabel}</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#1a2035;min-height:100vh}
-.print-btn{display:block;width:calc(100% - 24px);margin:12px;padding:14px;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer}
+html{font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#1a2035;min-height:100vh;width:100%;overflow-x:hidden}
+.print-btn{display:block;width:calc(100% - 24px);margin:12px auto;padding:16px;background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer}
 .card{background:#fff;margin:0 12px 10px;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .card-hdr{background:linear-gradient(135deg,#1e3a8a,#1d4ed8);color:#fff;padding:14px 16px}
 .card-empresa{font-size:11px;opacity:0.75;margin-bottom:2px}
@@ -1431,12 +1454,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;ba
 .tbl-wrap{margin:0 12px 10px;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
 thead tr{background:linear-gradient(135deg,#1e3a8a,#1d4ed8)}
-th{color:#fff;padding:10px 10px;text-align:left;font-size:12px;font-weight:600;white-space:nowrap}
-td{padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:13px}
+th{color:#fff;padding:10px 10px;text-align:left;font-size:14px;font-weight:600;white-space:nowrap}
+td{padding:10px 10px;border-bottom:1px solid #f1f5f9;font-size:14px}
 tr:last-child td{border-bottom:none}
 .muted{color:#94a3b8;font-style:italic;font-size:11px}
 .pie{text-align:center;font-size:10px;color:#94a3b8;padding:10px 12px 20px;font-style:italic}
-@media(max-width:480px){body{background:#fff}.card,.tbl-wrap,.aviso,.totales{margin:0 0 8px;border-radius:0}th,td{padding:8px 8px;font-size:12px}}
+@media(max-width:600px){body{background:#fff}.card,.tbl-wrap,.aviso,.totales{margin:0 0 8px;border-radius:0}th{font-size:13px;padding:10px 8px}td{font-size:13px;padding:9px 8px}.print-btn{border-radius:0}}
 @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:#fff}.print-btn{display:none!important}.card,.tbl-wrap{margin:0 0 6px;box-shadow:none;border-radius:4px}th,td{font-size:10px;padding:5px 6px}}
 </style></head><body>
 <button onclick="window.print()" class="print-btn">🖨️ Imprimir / Guardar PDF</button>
@@ -1460,9 +1483,10 @@ tr:last-child td{border-bottom:none}
 <div class="pie">${empresa} · ${hoy}</div>
 </body></html>`;
 
-  const w = window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
+  // Use blob URL for better mobile viewport support
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 }
 
 function verDetalleDia(ds){
@@ -2400,17 +2424,17 @@ function buildEmpSheet(emp, from, to){
 
   // Styles
   const S = {
-    title:    {font:{bold:true,sz:14,color:{rgb:'1F2D5C'}}, alignment:{horizontal:'center'}},
-    subtitle: {font:{bold:true,sz:11,color:{rgb:'1F2D5C'}}, alignment:{horizontal:'center'}},
-    label:    {font:{bold:true,sz:10,color:{rgb:'444444'}}, fill:{fgColor:{rgb:'EEF2FF'}}, border:{bottom:{style:'thin',color:{rgb:'AAAAAA'}}}},
-    colHead:  {font:{bold:true,sz:9,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1F2D5C'}}, alignment:{horizontal:'center'}, border:{bottom:{style:'medium',color:{rgb:'1F2D5C'}}}},
-    cell:     {font:{sz:9}, border:{bottom:{style:'thin',color:{rgb:'DDDDDD'}}, right:{style:'thin',color:{rgb:'DDDDDD'}}}},
-    cellGray: {font:{sz:9}, fill:{fgColor:{rgb:'F7F8FC'}}, border:{bottom:{style:'thin',color:{rgb:'DDDDDD'}}, right:{style:'thin',color:{rgb:'DDDDDD'}}}},
-    cellBold: {font:{bold:true,sz:9}, border:{bottom:{style:'thin',color:{rgb:'DDDDDD'}}}},
-    total:    {font:{bold:true,sz:10,color:{rgb:'1F2D5C'}}, fill:{fgColor:{rgb:'EEF2FF'}}, border:{top:{style:'medium',color:{rgb:'1F2D5C'}}, bottom:{style:'medium',color:{rgb:'1F2D5C'}}}},
-    footer:   {font:{sz:9,italic:true,color:{rgb:'555555'}}},
-    footerB:  {font:{bold:true,sz:10,color:{rgb:'1F2D5C'}}},
-    sign:     {font:{sz:9}, border:{bottom:{style:'medium',color:{rgb:'333333'}}}},
+    title:    {font:{bold:true,sz:16,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, alignment:{horizontal:'center',vertical:'center'}},
+    subtitle: {font:{bold:true,sz:12,color:{rgb:'1E3A8A'}}, fill:{fgColor:{rgb:'EFF6FF'}}, alignment:{horizontal:'left'}},
+    label:    {font:{bold:true,sz:10,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, border:{bottom:{style:'thin',color:{rgb:'1E3A8A'}}}},
+    colHead:  {font:{bold:true,sz:10,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, alignment:{horizontal:'center'}, border:{bottom:{style:'medium',color:{rgb:'1E3A8A'}}, right:{style:'thin',color:{rgb:'FFFFFF'}}}},
+    cell:     {font:{sz:10}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}, right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{vertical:'center'}},
+    cellGray: {font:{sz:10}, fill:{fgColor:{rgb:'F8FAFC'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}, right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{vertical:'center'}},
+    cellBold: {font:{bold:true,sz:10,color:{rgb:'1E3A8A'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}}},
+    total:    {font:{bold:true,sz:11,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, border:{top:{style:'medium',color:{rgb:'1E3A8A'}}, bottom:{style:'medium',color:{rgb:'1E3A8A'}}}, alignment:{horizontal:'right'}},
+    footer:   {font:{sz:9,italic:true,color:{rgb:'64748B'}}},
+    footerB:  {font:{bold:true,sz:11,color:{rgb:'1E3A8A'}}},
+    sign:     {font:{sz:9}, border:{bottom:{style:'medium',color:{rgb:'374151'}}}},
     empty:    {},
   };
 
@@ -2431,8 +2455,8 @@ function buildEmpSheet(emp, from, to){
 
   // ─── HEADER ─────────────────────────────────────────────────────────────────
   blank(); // row 0 top margin
-  row([empresa, S.title]);                          setH(R-1, 22);
-  row(['Control de Jornada Laboral', S.subtitle]);  setH(R-1, 18);
+  row([empresa, S.title]);                          setH(R-1, 32);
+  row(['Control de Jornada Laboral', S.subtitle]);  setH(R-1, 24);
   blank();
 
   row(['Empresa:',    S.label], [empresa,    S.cellBold]);
@@ -2446,12 +2470,12 @@ function buildEmpSheet(emp, from, to){
 
   if(isAut){
     // ─── TRAMOS ───────────────────────────────────────────────────────────────
-    const moneyStyle = {font:{sz:9}, numFmt:'#,##0.00 "€"', border:{bottom:{style:'thin',color:{rgb:'DDDDDD'}}, right:{style:'thin',color:{rgb:'DDDDDD'}}}};
-    const moneyGray  = {font:{sz:9}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'F7F8FC'}}, border:{bottom:{style:'thin',color:{rgb:'DDDDDD'}}, right:{style:'thin',color:{rgb:'DDDDDD'}}}};
-    const moneyTotal = {font:{bold:true,sz:10,color:{rgb:'1F2D5C'}}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'EEF2FF'}}, border:{top:{style:'medium',color:{rgb:'1F2D5C'}}, bottom:{style:'medium',color:{rgb:'1F2D5C'}}}};
+    const moneyStyle = {font:{sz:10,color:{rgb:'15803D'}}, numFmt:'#,##0.00 "€"', border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}, right:{style:'thin',color:{rgb:'E2E8F0'}}}};
+    const moneyGray  = {font:{sz:10,color:{rgb:'15803D'}}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'F5F7FA'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}, right:{style:'thin',color:{rgb:'E2E8F0'}}}};
+    const moneyTotal = {font:{bold:true,sz:11,color:{rgb:'FFFFFF'}}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'1F3A6E'}}, border:{top:{style:'medium',color:{rgb:'1F3A6E'}}, bottom:{style:'medium',color:{rgb:'1F3A6E'}}}};
 
-    row(['Fecha',S.colHead],['Inicio',S.colHead],['Fin',S.colHead],['Descanso',S.colHead],['Horas netas',S.colHead],['Precio/h',S.colHead],['Importe',S.colHead],['Obra / Descripción',S.colHead]);
-    setH(R-1, 16);
+    row(['Fecha',S.colHead],['Inicio',S.colHead],['Fin',S.colHead],['Descanso',S.colHead],['Horas netas',S.colHead],['Precio/h (€)',S.colHead],['Importe (€)',S.colHead],['Obra / Descripción',S.colHead]);
+    setH(R-1, 20);
 
     let list = [...tramos].filter(t=>t.empId==emp.id);
     if(from) list=list.filter(t=>t.fecha>=from);
@@ -2484,8 +2508,8 @@ function buildEmpSheet(emp, from, to){
 
   } else {
     // ─── FICHAJES ─────────────────────────────────────────────────────────────
-    row(['Fecha',S.colHead],['Entrada',S.colHead],['Pausa ini.',S.colHead],['Pausa fin.',S.colHead],['Salida',S.colHead],['Horas',S.colHead],['Revisado',S.colHead]);
-    setH(R-1, 16);
+    row(['Fecha',S.colHead],['Entrada',S.colHead],['Ini. pausa',S.colHead],['Fin pausa',S.colHead],['Salida',S.colHead],['Horas',S.colHead],['Revisado',S.colHead]);
+    setH(R-1, 20);
 
     let list = [...registros].filter(r=>r.empId==emp.id);
     if(from) list=list.filter(r=>r.fecha>=from);
@@ -2498,12 +2522,13 @@ function buildEmpSheet(emp, from, to){
       list.forEach((r,i)=>{
         const h=calcH(r); totalHoras+=h;
         const st=i%2===0?S.cell:S.cellGray;
-        const stR=r.revisado?{font:{sz:9,color:{rgb:'22C55E'}},fill:{fgColor:{rgb:'F0FDF4'}},border:S.cell.border}:st;
+        const stR=r.revisado?S.revisado:st;
         row([fmtFecha(r.fecha),st],[r.entrada||'—',st],[r.pausaI||'—',st],[r.pausaF||'—',st],[r.salida||'—',st],[fmtH(h),st],[r.revisado?'✓':'',stR]);
       });
     }
     blank();
     row(['TOTAL HORAS',S.total],[null,null],[null,null],[null,null],[null,null],[fmtH(totalHoras),S.total]);
+    setH(R-1,20);
     blank();
 
     // ─── AUSENCIAS ────────────────────────────────────────────────────────────
