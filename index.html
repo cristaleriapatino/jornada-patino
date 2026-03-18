@@ -2081,6 +2081,7 @@ function renderAjustes(c){
     <div class="form-field"><label>CIF de la empresa</label><input type="text" id="aj-cif" value="${config.cif||''}" placeholder="B81044430"></div>
     <div class="form-field"><label>Dirección</label><input type="text" id="aj-dir" value="${config.direccion||''}" placeholder="C/ Francos Rodríguez 98, Madrid"></div>
   </div>
+  <div class="form-field"><label>Nº Cuenta de Cotización S.S.</label><input type="text" id="aj-cotizacion" value="${config.cotizacion||'28 113241026'}" placeholder="28 113241026"></div>
   <div class="form-field"><label>Localidad (para pie de firma)</label><input type="text" id="aj-localidad" value="${config.localidad||'Madrid'}"></div>
   <div class="form-field"><label>PIN de administrador (4 dígitos)</label><input type="number" id="aj-pin" value="${config.adminPin}" maxlength="4"></div>
   <button class="btn-primary" onclick="guardarAjustes()">Guardar cambios</button>
@@ -2193,11 +2194,13 @@ function guardarAjustes(){
   const emp=document.getElementById('aj-empresa').value.trim();
   const cif=document.getElementById('aj-cif').value.trim();
   const dir=document.getElementById('aj-dir').value.trim();
+  const cotizacion=document.getElementById('aj-cotizacion').value.trim();
   const loc=document.getElementById('aj-localidad').value.trim();
   const pin=String(document.getElementById('aj-pin').value).trim().slice(0,4);
   if(emp)config.empresa=emp;
   if(cif)config.cif=cif;
   if(dir)config.direccion=dir;
+  if(cotizacion)config.cotizacion=cotizacion;
   if(loc)config.localidad=loc;
   if(pin&&pin.length===4)config.adminPin=pin;
   saveAll();alert('Ajustes guardados');
@@ -2383,7 +2386,7 @@ td{padding:5px 8px;border:1px solid #e2e8f0;font-size:10px;vertical-align:middle
   </div>
 </div>
 
-<div class="pie">${empresa}${direccion?' · '+direccion:''} · Generado: ${today()}</div>
+<div class="pie">${empresa}${cif?' · CIF: '+cif:''}${config.cotizacion?' · Nº Cta. Cotiz. S.S.: '+config.cotizacion:' · Nº Cta. Cotiz. S.S.: 28 113241026'}</div>
 </body></html>`;
 
   const w = window.open('', '_blank');
@@ -2457,18 +2460,32 @@ function buildEmpSheet(emp, from, to){
 
   // ─── HEADER ─────────────────────────────────────────────────────────────────
   blank(); // row 0 top margin
-  row([empresa, S.title]);                               setH(R-1, 32);
-  row(['CONTROL DE JORNADA LABORAL', S.subtitle]);       setH(R-1, 24);
+  const nCols2 = isAut ? 7 : 6; // max col index
+  row([empresa, S.title]);  setH(R-1, 32);
+  // Fill remaining cells of title row with same style so merge looks solid
+  for(let _c=1;_c<=nCols2;_c++){ const _ref=XLSX.utils.encode_cell({r:R-1,c:_c}); ws[_ref]={v:'',t:'s',s:S.title}; }
+  ws['!merges'].push({s:{r:R-1,c:0},e:{r:R-1,c:nCols2}});
+  row(['CONTROL DE JORNADA LABORAL', S.subtitle]);  setH(R-1, 24);
+  for(let _c=1;_c<=nCols2;_c++){ const _ref=XLSX.utils.encode_cell({r:R-1,c:_c}); ws[_ref]={v:'',t:'s',s:S.subtitle}; }
+  ws['!merges'].push({s:{r:R-1,c:0},e:{r:R-1,c:nCols2}});
   blank();
 
-  row(['Empresa:',       S.label], [empresa,                                   S.cellBold]);
-  row(['Empleado:',      S.label], [emp.nombre,                                S.cellBold]);
-  if(emp.dni)     row(['DNI/NIE:',      S.label], [emp.dni,                    S.cell]);
-  if(emp.ss)      row(['Nº Afil. S.S.:',S.label], [emp.ss,                    S.cell]);
-  if(emp.catProf) row(['Categoría prof:',S.label],[emp.catProf,               S.cell]);
-  row(['Categoría:',     S.label], [catLabel,                                  S.cell]);
-  row(['Período:',       S.label], [fmtFecha(from) + '  —  ' + fmtFecha(to||today()), S.cell]);
-  row(['Generado:',      S.label], [fmtFecha(today()),                         S.cell]);
+  const infoRow = (label, value) => {
+    const r0=R; row([label, S.label], [value, S.cellBold]);
+    // merge value cell across remaining columns
+    const lastC = isAut?7:6;
+    for(let _c=2;_c<=lastC;_c++){ const _ref=XLSX.utils.encode_cell({r:r0,c:_c}); ws[_ref]={v:'',t:'s',s:S.cellBold}; }
+    ws['!merges'].push({s:{r:r0,c:1},e:{r:r0,c:lastC}});
+    setH(r0, 16);
+  };
+  infoRow('Empresa:', empresa);
+  infoRow('Empleado:', emp.nombre);
+  if(emp.dni)     infoRow('DNI/NIE:', emp.dni);
+  if(emp.ss)      infoRow('Nº Afil. S.S.:', emp.ss);
+  if(emp.catProf) infoRow('Categoría prof:', emp.catProf);
+  infoRow('Categoría:', catLabel);
+  infoRow('Período:', fmtFecha(from) + '  —  ' + fmtFecha(to||today()));
+  infoRow('Generado:', fmtFecha(today()));
   blank();
 
   let totalHoras = 0;
@@ -2643,43 +2660,100 @@ function doExport(tipo){
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   });
 
-  // ─ Summary sheet ────────────────────────────────────────────────────────────
-  const summaryRows = [];
-  summaryRows.push([config.empresa || 'Cristalería Patiño, S.L.']);
-  summaryRows.push(['Resumen de jornada — ' + (from||'—') + ' a ' + (to||today())]);
-  summaryRows.push(['']);
-  summaryRows.push(['Empleado', 'Categoría', 'Total horas', 'Importe (€)', 'Vac. usadas', 'Vac. restantes']);
-  empList.forEach(emp => {
+  // ─ Summary sheet (styled) ────────────────────────────────────────────────────
+  const SS = {
+    title:   {font:{bold:true,sz:16,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, alignment:{horizontal:'center',vertical:'center'}},
+    sub:     {font:{bold:true,sz:11,color:{rgb:'1E3A8A'}}, fill:{fgColor:{rgb:'EFF6FF'}}, alignment:{horizontal:'left',vertical:'center'}},
+    head:    {font:{bold:true,sz:10,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, alignment:{horizontal:'center',vertical:'center'}, border:{bottom:{style:'medium',color:{rgb:'1E3A8A'}}}},
+    cell:    {font:{sz:10}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{vertical:'center'}},
+    gray:    {font:{sz:10}, fill:{fgColor:{rgb:'F8FAFC'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{vertical:'center'}},
+    green:   {font:{sz:10,color:{rgb:'15803D'}}, fill:{fgColor:{rgb:'F0FDF4'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{horizontal:'right',vertical:'center'}},
+    total:   {font:{bold:true,sz:11,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E3A8A'}}, alignment:{horizontal:'right',vertical:'center'}},
+    numMoney:{font:{sz:10,color:{rgb:'15803D'}}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'F0FDF4'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{horizontal:'right',vertical:'center'}},
+    numMoneyGray:{font:{sz:10,color:{rgb:'15803D'}}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'F8FAFC'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}},right:{style:'thin',color:{rgb:'E2E8F0'}}}, alignment:{horizontal:'right',vertical:'center'}},
+    numTot:  {font:{bold:true,sz:11,color:{rgb:'FFFFFF'}}, numFmt:'#,##0.00 "€"', fill:{fgColor:{rgb:'1E3A8A'}}, alignment:{horizontal:'right',vertical:'center'}},
+  };
+  const wsS = {};
+  wsS['!merges'] = [];
+  let sR = 0;
+  const NC = 6; // 6 columns A-F
+
+  function sCell(c, v, st){ const ref=XLSX.utils.encode_cell({r:sR,c}); wsS[ref]={v:v===undefined||v===null?'':v,t:typeof v==='number'?'n':'s',s:st||SS.cell}; }
+  function sRow(...args){ args.forEach((a,i)=>{if(a!==null)sCell(i,a[0],a[1]);}); sR++; }
+  function sBlank(){ sRow(); }
+  function sMerge(r,c1,c2){ wsS['!merges'].push({s:{r,c:c1},e:{r,c:c2}}); }
+  function sSeth(r,h){ if(!wsS['!rows'])wsS['!rows']=[];wsS['!rows'][r]={hpt:h}; }
+
+  const empresaN = config.empresa || 'Cristalería Patiño, S.L.';
+  const periodoN = (from||'—') + '  —  ' + (to||today());
+
+  sBlank();
+  sCell(0, empresaN, SS.title); for(let c=1;c<NC;c++) sCell(c,'',SS.title);
+  sMerge(sR-1, 0, NC-1); sSeth(sR-1, 30);
+  sRow();
+  sCell(0, 'RESUMEN DE JORNADA', SS.title); for(let c=1;c<NC;c++) sCell(c,'',SS.title);
+  sMerge(sR-1, 0, NC-1); sSeth(sR-1, 26);
+  sRow();
+  sBlank();
+  sCell(0, 'Período:', SS.head); sCell(1, periodoN, SS.sub); for(let c=2;c<NC;c++) sCell(c,'',SS.sub);
+  sMerge(sR-1, 1, NC-1); sSeth(sR-1, 20);
+  sRow();
+  sCell(0, 'Generado:', SS.head); sCell(1, fmtFecha(today()), SS.sub); for(let c=2;c<NC;c++) sCell(c,'',SS.sub);
+  sMerge(sR-1, 1, NC-1);
+  sRow();
+  sBlank();
+
+  // Column headers
+  ['Empleado','Categoría','Total horas','Importe (€)','Vac. usadas','Vac. restantes'].forEach((h,i)=>sCell(i,h,SS.head));
+  sSeth(sR-1, 20); sRow();
+
+  // Data rows
+  let grandH=0, grandImp=0;
+  empList.forEach((emp,idx) => {
     const isAut = emp.categoria === 'autonomo';
-    let totalH = 0;
+    let totalH = 0, totalImpS = 0;
     if(isAut){
       let list = tramos.filter(t => t.empId == emp.id);
       if(from) list = list.filter(t => t.fecha >= from);
       if(to)   list = list.filter(t => t.fecha <= to);
-      totalH = list.reduce((s,t) => s + calcTramoH(t), 0);
+      totalH   = list.reduce((s,t) => s + calcTramoH(t), 0);
+      totalImpS= list.reduce((s,t) => s + Math.round(calcTramoH(t)*(t.precio||22)*100)/100, 0);
     } else {
       let list = registros.filter(r => r.empId == emp.id);
       if(from) list = list.filter(r => r.fecha >= from);
       if(to)   list = list.filter(r => r.fecha <= to);
       totalH = list.reduce((s,r) => s + calcH(r), 0);
     }
+    grandH += totalH;
+    grandImp += totalImpS;
     const usadas = isAut ? '—' : vacUsadas(emp.id);
     const rest   = isAut ? '—' : Math.max(0, (emp.vacTotal||22) - vacUsadas(emp.id));
     const catLbl  = isAut ? 'Autónomo' : emp.categoria==='pruebas' ? 'Pruebas' : 'Régimen General';
-    let totalImpS = 0;
-    if(isAut){
-      let listI = tramos.filter(t => t.empId == emp.id);
-      if(from) listI = listI.filter(t => t.fecha >= from);
-      if(to)   listI = listI.filter(t => t.fecha <= to);
-      totalImpS = listI.reduce((s,t) => s + Math.round(calcTramoH(t)*(t.precio||22)*100)/100, 0);
-    }
-    const impStr = isAut ? totalImpS.toFixed(2)+' €' : '—';
-    summaryRows.push([emp.nombre, catLbl, fmtH(totalH), impStr, usadas, rest]);
+    const alt = idx%2===1;
+    const stC = alt?SS.gray:SS.cell;
+    const stM = isAut ? (alt?SS.numMoneyGray:SS.numMoney) : stC;
+    sCell(0, emp.nombre, stC);
+    sCell(1, catLbl, stC);
+    sCell(2, fmtH(totalH), stC);
+    // Importe: numeric for autonomos so formatting works
+    if(isAut){ sCell(3, totalImpS, stM); } else { sCell(3, '—', stC); }
+    sCell(4, typeof usadas==='number'?usadas:usadas, stC);
+    sCell(5, typeof rest==='number'?rest:rest, stC);
+    sSeth(sR-1, 18); sRow();
   });
 
-  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
-  autoWidth(wsSummary, summaryRows);
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
+  // Total row
+  sCell(0, 'TOTAL', SS.total); sCell(1, '', SS.total);
+  sCell(2, fmtH(grandH), SS.total);
+  sCell(3, grandImp, SS.numTot);
+  sCell(4, '', SS.total); sCell(5, '', SS.total);
+  sSeth(sR-1, 20); sRow();
+
+  wsS['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:sR,c:NC-1}});
+  wsS['!cols'] = [{wch:28},{wch:16},{wch:12},{wch:14},{wch:12},{wch:14}];
+  wsS['!pageSetup'] = {paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+
+  XLSX.utils.book_append_sheet(wb, wsS, 'Resumen');
 
   XLSX.writeFile(wb, 'jornada_' + (config.empresa||'empresa').replace(/[^a-zA-Z0-9]/g,'_') + '_' + today() + '.xlsx');
 }
