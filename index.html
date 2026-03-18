@@ -2435,11 +2435,13 @@ function buildEmpSheet(emp, from, to){
     footer:   {font:{sz:9,italic:true,color:{rgb:'64748B'}}},
     footerB:  {font:{bold:true,sz:11,color:{rgb:'1E3A8A'}}},
     sign:     {font:{sz:9}, border:{bottom:{style:'medium',color:{rgb:'374151'}}}},
+    revisado: {font:{sz:10,color:{rgb:'15803D'}}, fill:{fgColor:{rgb:'F0FDF4'}}, border:{bottom:{style:'thin',color:{rgb:'E2E8F0'}}, right:{style:'thin',color:{rgb:'E2E8F0'}}}},
     empty:    {},
   };
 
   // Helper: set cell with style
   const ws = {};
+  if(!ws['!merges']) ws['!merges'] = [];
   let R = 0; // current row (0-indexed)
   const data = []; // for column width calc
 
@@ -2455,15 +2457,18 @@ function buildEmpSheet(emp, from, to){
 
   // ─── HEADER ─────────────────────────────────────────────────────────────────
   blank(); // row 0 top margin
-  row([empresa, S.title]);                          setH(R-1, 32);
-  row(['Control de Jornada Laboral', S.subtitle]);  setH(R-1, 24);
+  row([empresa, S.title]);                               setH(R-1, 32);
+  row(['CONTROL DE JORNADA LABORAL', S.subtitle]);       setH(R-1, 24);
   blank();
 
-  row(['Empresa:',    S.label], [empresa,    S.cellBold]);
-  row(['Empleado:',   S.label], [emp.nombre, S.cellBold]);
-  row(['Categoría:',  S.label], [catLabel,   S.cell]);
-  row(['Período:',    S.label], [fmtFecha(from) + '  —  ' + fmtFecha(to||today()), S.cell]);
-  row(['Fecha emisión:', S.label], [fmtFecha(today()), S.cell]);
+  row(['Empresa:',       S.label], [empresa,                                   S.cellBold]);
+  row(['Empleado:',      S.label], [emp.nombre,                                S.cellBold]);
+  if(emp.dni)     row(['DNI/NIE:',      S.label], [emp.dni,                    S.cell]);
+  if(emp.ss)      row(['Nº Afil. S.S.:',S.label], [emp.ss,                    S.cell]);
+  if(emp.catProf) row(['Categoría prof:',S.label],[emp.catProf,               S.cell]);
+  row(['Categoría:',     S.label], [catLabel,                                  S.cell]);
+  row(['Período:',       S.label], [fmtFecha(from) + '  —  ' + fmtFecha(to||today()), S.cell]);
+  row(['Generado:',      S.label], [fmtFecha(today()),                         S.cell]);
   blank();
 
   let totalHoras = 0;
@@ -2585,7 +2590,7 @@ function buildEmpSheet(emp, from, to){
   if(isAut){
     ws['!cols'] = [{wch:12},{wch:7},{wch:7},{wch:9},{wch:9},{wch:9},{wch:10},{wch:30}];
   } else {
-    ws['!cols'] = [{wch:12},{wch:8},{wch:10},{wch:10},{wch:8},{wch:8},{wch:9}];
+    ws['!cols'] = [{wch:13},{wch:9},{wch:10},{wch:10},{wch:9},{wch:9},{wch:10}];
   }
 
   // Print settings: A4 portrait, fit to 1 page wide
