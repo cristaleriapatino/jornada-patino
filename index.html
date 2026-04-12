@@ -518,8 +518,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="form-field"><label>Nombre completo</label><input type="text" id="m-emp-nombre" maxlength="40" placeholder="Ana García..."></div>
     <div class="form-row2">
       <div class="form-field"><label>DNI / NIE</label><input type="text" id="m-emp-dni" maxlength="12" placeholder="07524898B"></div>
-      <div class="form-field"><label>Nº Afil. Seguridad Social</label><input type="text" id="m-emp-ss" maxlength="20" placeholder="28 0440859334"></div>
+      <div class="form-field"><label>Fecha de alta en empresa</label><input type="date" id="m-emp-alta"></div>
     </div>
+    <div class="form-field"><label>Nº Afil. Seguridad Social</label><input type="text" id="m-emp-ss" maxlength="20" placeholder="28 0440859334"></div>
     <div class="form-field"><label>Categoría profesional</label><input type="text" id="m-emp-catprof" maxlength="40" placeholder="Grupo 7, Oficial 3ª..."></div>
     <div class="form-field"><label>Categoría</label><select id="m-emp-cat" onchange="toggleVacField()"><option value="general">Régimen General</option><option value="pruebas">Pruebas</option><option value="autonomo">Autónomo</option></select></div>
     <div class="form-row2">
@@ -2036,9 +2037,10 @@ function cargarHorarioMercedes(){
     return;
   }
   // Rellenar datos personales de Mercedes
-  emp.dni     = '07524898B';
-  emp.ss      = '28 0440859334';
-  emp.catProf = 'Grupo 7, Oficial 3ª';
+  emp.dni       = '07524898B';
+  emp.fechaAlta = '2026-02-16';
+  emp.ss        = '28 0440859334';
+  emp.catProf   = 'Grupo 7, Oficial 3ª';
   const dias = [
     '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',
     '2026-02-23','2026-02-24','2026-02-25','2026-02-26','2026-02-27',
@@ -2159,6 +2161,7 @@ function openEmpModal(id){
   document.getElementById('m-emp-id').value=id||'';
   document.getElementById('m-emp-nombre').value=emp?emp.nombre:'';
   document.getElementById('m-emp-dni').value=emp?emp.dni||'':'';
+  document.getElementById('m-emp-alta').value=emp?emp.fechaAlta||'':'';
   document.getElementById('m-emp-ss').value=emp?emp.ss||'':'';
   document.getElementById('m-emp-catprof').value=emp?emp.catProf||'':'';
   document.getElementById('m-emp-pin').value=emp?emp.pin:'';
@@ -2172,14 +2175,15 @@ function guardarEmpleado(){
   const id=document.getElementById('m-emp-id').value;
   const nombre=document.getElementById('m-emp-nombre').value.trim();
   const dni=document.getElementById('m-emp-dni').value.trim();
+  const fechaAlta=document.getElementById('m-emp-alta').value.trim();
   const ss=document.getElementById('m-emp-ss').value.trim();
   const catProf=document.getElementById('m-emp-catprof').value.trim();
   const pin=String(document.getElementById('m-emp-pin').value).trim().slice(0,4);
   const vacTotal=parseInt(document.getElementById('m-emp-vac').value)||22;
   const categoria=document.getElementById('m-emp-cat').value||'general';
   if(!nombre)return;
-  if(id){const emp=empById(parseInt(id));if(emp){emp.nombre=nombre;emp.dni=dni;emp.ss=ss;emp.catProf=catProf;emp.pin=pin;emp.vacTotal=vacTotal;emp.categoria=categoria;}}
-  else{empleados.push({id:Date.now(),nombre,dni,ss,catProf,pin,vacTotal,categoria,color:EMP_COLORS[empleados.length%EMP_COLORS.length]});}
+  if(id){const emp=empById(parseInt(id));if(emp){emp.nombre=nombre;emp.dni=dni;emp.fechaAlta=fechaAlta;emp.ss=ss;emp.catProf=catProf;emp.pin=pin;emp.vacTotal=vacTotal;emp.categoria=categoria;}}
+  else{empleados.push({id:Date.now(),nombre,dni,fechaAlta,ss,catProf,pin,vacTotal,categoria,color:EMP_COLORS[empleados.length%EMP_COLORS.length]});}
   saveAll();closeModal('modal-emp');adminTab('empleados');
 }
 
@@ -2358,7 +2362,7 @@ td{padding:5px 8px;border:1px solid #e2e8f0;font-size:10px;vertical-align:middle
   <div class="info-cell"><span class="info-label">Trabajador/a:</span><span class="info-val">${emp.nombre}</span></div>
   <div class="info-cell"><span class="info-label">DNI/NIE:</span><span class="info-val">${emp.dni||'___________________'}</span></div>
   <div class="info-cell"><span class="info-label">Nº Afil. S.S.:</span><span class="info-val">${emp.ss||'___________________'}</span></div>
-  <div class="info-cell"><span class="info-label">Fecha alta:</span><span class="info-val">${dFrom}</span></div>
+  <div class="info-cell"><span class="info-label">Fecha alta:</span><span class="info-val">${emp.fechaAlta||'—'}</span></div>
   <div class="info-cell"><span class="info-label">Categoría:</span><span class="info-val">${emp.catProf||'___________________'}</span></div>
   <div class="info-cell"><span class="info-label">Empresa:</span><span class="info-val">${empresa}</span></div>
 </div>
