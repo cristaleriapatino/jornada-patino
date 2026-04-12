@@ -658,15 +658,16 @@ function refreshCurrentView(){
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
-function today(){return new Date().toISOString().split('T')[0];}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function dateToStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function timeNow(){return new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});}
 function initials(n){return n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 function empById(id){return empleados.find(e=>e.id==id);}
 function esFestivo(f){return FESTIVOS.some(x=>x.f===f);}
 function getFestivo(f){return FESTIVOS.find(x=>x.f===f);}
 function isWeekend(ds){const d=new Date(ds+'T00:00:00');return d.getDay()===0||d.getDay()===6;}
-function getMon(ds){const d=new Date(ds+'T00:00:00'),day=d.getDay(),diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);return d.toISOString().split('T')[0];}
-function weekDates(mon){const d=new Date(mon+'T00:00:00');return Array.from({length:5},(_,i)=>{const dd=new Date(d);dd.setDate(d.getDate()+i);return dd.toISOString().split('T')[0];});}
+function getMon(ds){const d=new Date(ds+'T00:00:00'),day=d.getDay(),diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);return dateToStr(d);}
+function weekDates(mon){const d=new Date(mon+'T00:00:00');return Array.from({length:5},(_,i)=>{const dd=new Date(d);dd.setDate(d.getDate()+i);return dateToStr(dd);});}
 function parseT(t){if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m;}
 function calcH(rec){
   if(!rec||!rec.entrada)return 0;
@@ -703,7 +704,7 @@ function vacUsadas(empId){
     if(!a.fin)return s;
     let days=0,d=new Date(a.inicio+'T00:00:00');
     const end=new Date(a.fin+'T00:00:00');
-    while(d<=end){const ds=d.toISOString().split('T')[0];if(!isWeekend(ds)&&!esFestivo(ds))days++;d.setDate(d.getDate()+1);}
+    while(d<=end){const ds=dateToStr(d);if(!isWeekend(ds)&&!esFestivo(ds))days++;d.setDate(d.getDate()+1);}
     return s+days;
   },0);
 }
@@ -1365,7 +1366,7 @@ function generarMiResumen(fromParam, toParam){
   const dEndLoop = new Date(dTo+'T00:00:00');
 
   while(d <= dEndLoop){
-    const ds  = d.toISOString().split('T')[0];
+    const ds  = dateToStr(d);
     const dow = d.getDay();
     const isWe= dow===0||dow===6;
     const fest= getFestivo(ds);
@@ -2222,7 +2223,7 @@ function ultimoDiaLaborable(yyyymm){
   const [y,m] = yyyymm.split('-').map(Number);
   let d = new Date(y, m, 0);
   while(true){
-    const ds = d.toISOString().split('T')[0];
+    const ds = dateToStr(d);
     const dow = d.getDay();
     if(dow!==0 && dow!==6 && !esFestivo(ds)) return ds;
     d.setDate(d.getDate()-1);
@@ -2258,7 +2259,7 @@ function generarRegistroMensual(emp, from, to){
 
   const d = new Date(dStart);
   while(d <= dEnd){
-    const ds = d.toISOString().split('T')[0];
+    const ds = dateToStr(d);
     const dow= d.getDay();
     const isWe = dow===0||dow===6;
     const fest = getFestivo(ds);
@@ -2386,7 +2387,7 @@ td{padding:5px 8px;border:1px solid #e2e8f0;font-size:10px;vertical-align:middle
   </div>
 </div>
 
-<div class="pie">${empresa}${cif?' · CIF: '+cif:''}${config.cotizacion?' · Nº Cta. Cotiz. S.S.: '+config.cotizacion:' · Nº Cta. Cotiz. S.S.: 28 113241026'}</div>
+<div class="pie">${empresa} · CIF: ${cif||'B81044430'} · Nº Cta. Cotiz. S.S.: ${config.cotizacion||'28 113241026'}</div>
 </body></html>`;
 
   const w = window.open('', '_blank');
@@ -2561,7 +2562,7 @@ function buildEmpSheet(emp, from, to){
       row(['Tipo',S.colHead],['Inicio',S.colHead],['Fin',S.colHead],['Días laborables',S.colHead],['Notas',S.colHead]);
       ausEmp.forEach((a,i)=>{
         let dias='';
-        if(a.fin){let d=new Date(a.inicio+'T00:00:00');const end=new Date(a.fin+'T00:00:00');let c=0;while(d<=end){const ds=d.toISOString().split('T')[0];if(!isWeekend(ds)&&!esFestivo(ds))c++;d.setDate(d.getDate()+1);}dias=c;}
+        if(a.fin){let d=new Date(a.inicio+'T00:00:00');const end=new Date(a.fin+'T00:00:00');let c=0;while(d<=end){const ds=dateToStr(d);if(!isWeekend(ds)&&!esFestivo(ds))c++;d.setDate(d.getDate()+1);}dias=c;}
         const st=i%2===0?S.cell:S.cellGray;
         row([tipoLabel(a.tipo),st],[fmtFecha(a.inicio),st],[fmtFecha(a.fin)||'Sin fecha fin',st],[dias,st],[a.notas||'',st]);
       });
